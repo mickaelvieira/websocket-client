@@ -1,17 +1,17 @@
-package ws_client
+package client
 
 // outside world statuses
 type Status uint64
 
 const (
-	StatusDisconnected Status = iota
-	StatusConnected
+	statusDisconnected Status = iota + 1
+	statusConnected
 )
 
 func (s Status) IsConnected() bool {
-	return s == StatusConnected
+	return s == statusConnected
 }
 
 func (s Status) IsDisconnected() bool {
-	return s == StatusDisconnected
+	return s == statusDisconnected
 }

@@ -1,14 +1,10 @@
-package ws_client
+package server
 
 import (
 	"log/slog"
-	"net/http"
 	"time"
-
-	gows "github.com/gorilla/websocket"
 )
 
-type DialerModifier func(*gows.Dialer)
 type OptionModifier func(*options)
 
 // WithRetryInterval sets the interval between reconnection attempts
@@ -32,13 +28,6 @@ func WithMaxRetryAttempts(attempts int) OptionModifier {
 	}
 }
 
-// WithHeaders sets custom HTTP headers for the websocket connection
-func WithHeaders(h http.Header) OptionModifier {
-	return func(o *options) {
-		o.headers = h
-	}
-}
-
 // WithLogger allows passing a custom logger for the websocket client
 // @see https://pkg.go.dev/log/slog
 func WithLogger(l *slog.Logger) OptionModifier {
@@ -47,32 +36,24 @@ func WithLogger(l *slog.Logger) OptionModifier {
 	}
 }
 
-// WithDialerModifier allows customizing the underlying websocket dialer before connecting
-// @see https://github.com/gorilla/websocket/blob/main/client.go#L53
-func WithDialerModifier(m DialerModifier) OptionModifier {
+func WithOnCloseCallback(cb func()) OptionModifier {
 	return func(o *options) {
-		o.dialerModifier = m
+		o.onClose = cb
 	}
 }
 
 var defaultOptions = options{
-	readWait:         1 * time.Second,
-	writeWait:        1 * time.Second,
-	pingInterval:     60 * time.Second,
-	retryInterval:    5 * time.Second,
-	maxRetryAttempts: 60, // 60 attempts every 5s, meaning we try for 5 minutes default
-	logger:           slog.New(slog.DiscardHandler),
+	readWait:      1 * time.Second,
+	writeWait:     1 * time.Second,
+	pingInterval:  54 * time.Second,
+	pongWait:      60 * time.Second,
+	retryInterval: 5 * time.Second,
+	logger:        slog.New(slog.DiscardHandler),
 }
 
 type options struct {
 	// logger for logging client events
 	logger *slog.Logger
-
-	// optional HTTP headers to include in the connection request
-	headers http.Header
-
-	// optional modifier to customize the dialer before connecting
-	dialerModifier DialerModifier
 
 	// retryInterval is the delay between reconnection attempts
 	retryInterval time.Duration
@@ -89,6 +70,12 @@ type options struct {
 	// pingInterval is the interval between pings to the peer
 	pingInterval time.Duration
 
+	// pongWait is the time allowed to read the next pong message from the peer
+	pongWait time.Duration
+
 	// the maximum size in bytes for a message read from the peer
 	readLimit int64
+
+	// optional onClose callback when the browser socket is closed
+	onClose func()
 }

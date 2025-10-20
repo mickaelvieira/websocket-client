@@ -1,4 +1,4 @@
-package ws_client
+package websocket
 
 import (
 	"crypto/rand"
@@ -6,7 +6,7 @@ import (
 	"math/big"
 )
 
-func genId() string {
+func GenId() string {
 	n, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
 	if err != nil {
 		panic(err)

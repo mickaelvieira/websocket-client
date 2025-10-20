@@ -1,10 +1,10 @@
-package ws_client
+package client
 
 // internal client states matching the state machine
 type state uint64
 
 const (
-	disconnected state = iota
+	disconnected state = iota + 1
 	connecting
 	connected
 	closing
