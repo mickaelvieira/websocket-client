@@ -9,7 +9,7 @@ import (
 	"time"
 
 	gows "github.com/gorilla/websocket"
-	"github.com/mickaelvieira/websocket-client"
+	"github.com/mickaelvieira/websocket"
 )
 
 type Client interface {

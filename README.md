@@ -47,7 +47,7 @@ import (
     "log"
     "time"
 
-    ws "github.com/mickaelvieira/websocket-client"
+    ws "github.com/mickaelvieira/websocket"
 )
 
 func main() {

@@ -1,4 +1,4 @@
-module github.com/mickaelvieira/websocket-client
+module github.com/mickaelvieira/websocket
 
 go 1.25.3
 
