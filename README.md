@@ -1,63 +1,60 @@
 
-# WebSocket Client
+# WebSocket Client [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Go Reference](https://pkg.go.dev/badge/github.com/mickaelvieira/websocket.svg)](https://pkg.go.dev/github.com/mickaelvieira/websocket)
 
-A Go WebSocket client is thin layer around the [Gorilla websocket package](https://github.com/gorilla/websocket) implementing automatic reconnection and state management.
+A Go WebSocket library providing both client and server implementations as a thin layer around the [Gorilla websocket package](https://github.com/gorilla/websocket). Features automatic reconnection, state management, and ping/pong handling.
+
+## Features
+
+- **Automatic Reconnection** - Client automatically reconnects on disconnection with configurable retry logic
+- **State Management** - Comprehensive state machine for connection lifecycle
+- **Ping/Pong Handling** - Built-in keep-alive mechanism
+- **Dual Implementations** - Both client and server socket implementations
 
 ## State Machine
 
 This WebSocket client implements a comprehensive state machine that handles all connection lifecycle events:
 
-```mermaid
-stateDiagram-v2
-    [*] --> DISCONNECTED
-
-    DISCONNECTED --> CONNECTING: connect attempt
-    CONNECTING --> CONNECTED: accepted
-    CONNECTING --> RECONNECTING: refused/timeout
-
-    CONNECTED --> CLOSING: send close frame
-    CLOSING --> DISCONNECTED: close ack received
-    CLOSING --> RECONNECTING: timeout/error (optional)
-    CLOSING --> DISCONNECTED: timeout/error (normal fallback)
-
-    CONNECTED --> DISCONNECTED: expected close from B
-    CONNECTED --> RECONNECTING: unexpected close or error
-    CONNECTED --> CONNECTED: successful read/write
-
-    RECONNECTING --> CONNECTED: retry succeeds
-    RECONNECTING --> DISCONNECTED: max attempts reached
-
-    DISCONNECTED --> [*]
-```
-
-## 📦 Installation
+## Installation
 
 ```bash
-go get github.com/mickaelvieira/websocket-client
+go get github.com/mickaelvieira/websocket
 ```
 
-## 🔧 Usage
+## Usage
 
-### Basic Example
+### Client Example
 
 ```go
 package main
 
 import (
     "log"
+    "log/slog"
+    "os"
     "time"
 
-    ws "github.com/mickaelvieira/websocket"
+    "github.com/mickaelvieira/websocket/client"
 )
 
 func main() {
+    // Create logger
+    logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+        Level: slog.LevelInfo,
+    }))
+
     // Create client with custom configuration
-    client := ws.NewClient("wss://echo.websocket.org", ws.WithLogger(slog.Default()))
-    defer client.Close()
+    c := client.NewClientSocket(
+        "wss://echo.websocket.org",
+        client.WithLogger(logger),
+        client.WithRetryInterval(2*time.Second),
+        client.WithMaxRetryAttempts(5),
+        client.WithPingInterval(30*time.Second),
+    )
+    defer c.Close()
 
     // Monitor connection status
     go func() {
-        for status := range client.Statuses() {
+        for status := range c.Statuses() {
             if status.IsConnected() {
                 log.Println("✅ Connected to WebSocket server")
             } else {
@@ -66,60 +63,161 @@ func main() {
         }
     }()
 
-    // Handle incoming binary messages
-    go func() {
-        for msg := range client.ReadBinaryMessages() {
-            log.Printf("📨 Received: %v", msg)
-        }
-    }()
-
     // Handle incoming text messages
     go func() {
-        for msg := range client.ReadTextMessages() {
-            log.Printf("📨 Received: %s", msg)
+        for msg := range c.ReadTextMessages() {
+            log.Printf("📨 Received text: %s", msg)
         }
     }()
 
-    // Send a message
-    if err := client.SendTextMessage("Hello WebSocket!"); err != nil {
-        log.Printf("❌ Send error: %v", err)
-    }
+    // Handle incoming binary messages
+    go func() {
+        for msg := range c.ReadBinaryMessages() {
+            log.Printf("📨 Received binary: %v", msg)
+        }
+    }()
+
+    // Send messages
+    c.SendTextMessage("Hello WebSocket!")
+    c.SendBinaryMessage([]byte{0x01, 0x02, 0x03})
 
     // Keep running
     time.Sleep(30 * time.Second)
 }
 ```
 
-### Configuration Options
+### Server Example
 
 ```go
-client := ws.NewClient("wss://api.example.com/ws",
+package main
+
+import (
+    "log"
+    "log/slog"
+    "net/http"
+    "os"
+
+    gows "github.com/gorilla/websocket"
+    "github.com/mickaelvieira/websocket/server"
+)
+
+var upgrader = gows.Upgrader{
+    CheckOrigin: func(r *http.Request) bool {
+        return true // Configure appropriately for production
+    },
+}
+
+func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+    // Upgrade HTTP connection to WebSocket
+    conn, err := upgrader.Upgrade(w, r, nil)
+    if err != nil {
+        log.Printf("Failed to upgrade connection: %v", err)
+        return
+    }
+
+    // Create logger
+    logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+        Level: slog.LevelInfo,
+    }))
+
+    // Create server socket
+    s := server.NewServerSocket(
+        conn,
+        server.WithLogger(logger),
+        server.WithPingInterval(30*time.Second),
+    )
+
+    log.Printf("Client connected: %s", s.Id())
+
+    // Handle incoming text messages
+    go func() {
+        for msg := range s.ReadTextMessages() {
+            log.Printf("📨 Received from %s: %s", s.Id(), msg)
+            // Echo message back
+            s.SendTextMessage("Echo: " + msg)
+        }
+    }()
+
+    // Handle incoming binary messages
+    go func() {
+        for msg := range s.ReadBinaryMessages() {
+            log.Printf("📨 Received binary from %s: %v", s.Id(), msg)
+            // Echo message back
+            s.SendBinaryMessage(msg)
+        }
+    }()
+
+    // Wait for connection to close
+    <-s.Wait()
+    log.Printf("Client disconnected: %s", s.Id())
+}
+
+func main() {
+    http.HandleFunc("/ws", handleWebSocket)
+
+    log.Println("Server starting on :8080")
+    if err := http.ListenAndServe(":8080", nil); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+### Configuration Options
+
+#### Client Options
+
+```go
+import (
+    "net/http"
+    "time"
+
+    "github.com/mickaelvieira/websocket/client"
+    gows "github.com/gorilla/websocket"
+)
+
+client := client.NewClientSocket("wss://api.example.com/ws",
     // Retry configuration
-    ws.WithRetryInterval(1*time.Second),      // Wait between retries, default 5s
-    ws.WithMaxRetryAttempts(5),               // Max reconnection attempts, default 60
+    client.WithRetryInterval(1*time.Second),      // Wait between retries (default: 5s)
+    client.WithMaxRetryAttempts(5),               // Max reconnection attempts (default: 60)
 
     // Ping configuration
-    ws.WithPingInterval(5*time.Second),       // Wait between pings, default 60s
+    client.WithPingInterval(30*time.Second),      // Interval between pings (default: 60s)
 
     // Custom headers for authentication
-    ws.WithHeaders(http.Header{
+    client.WithHeaders(http.Header{
         "Authorization": []string{"Bearer " + token},
         "User-Agent":    []string{"MyApp/1.0"},
     }),
 
     // Custom logger
-    ws.WithLogger(slog.New(slog.NewJSONHandler(os.Stdout, nil))),
+    client.WithLogger(slog.New(slog.NewJSONHandler(os.Stdout, nil))),
 
     // Custom dialer configuration
-    ws.WithDialerModifier(func(dialer *websocket.Dialer) {
-        dialer.HandshakeTimeout = 5 * time.Second
+    client.WithDialerModifier(func(dialer *gows.Dialer) {
+        dialer.HandshakeTimeout = 10 * time.Second
+        dialer.TLSClientConfig = &tls.Config{...}
     }),
 )
 ```
 
-## Testing
+#### Server Options
 
-```bash
-# Run the test suite
-go test -v -race
+```go
+import (
+    "time"
+
+    "github.com/mickaelvieira/websocket/server"
+)
+
+server := server.NewServerSocket(conn,
+    // Ping configuration
+    server.WithPingInterval(30*time.Second),      // Interval between pings (default: 54s)
+
+    // Custom logger
+    server.WithLogger(slog.New(slog.NewJSONHandler(os.Stdout, nil))),
+)
 ```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
