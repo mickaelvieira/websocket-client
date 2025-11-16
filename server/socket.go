@@ -7,6 +7,7 @@ import (
 
 	gows "github.com/gorilla/websocket"
 	"github.com/mickaelvieira/websocket"
+	"github.com/mickaelvieira/websocket/internal"
 )
 
 type Server interface {
@@ -18,7 +19,7 @@ type Server interface {
 
 func NewServerSocket(conn *gows.Conn, opts ...OptionModifier) Server {
 	wc := &server{
-		id:             websocket.GenId(),
+		id:             internal.GenId(),
 		conn:           conn,
 		wait:           make(chan struct{}),
 		outbound:       make(chan websocket.OutboundMessage),

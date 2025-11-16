@@ -10,6 +10,7 @@ import (
 
 	gows "github.com/gorilla/websocket"
 	"github.com/mickaelvieira/websocket"
+	"github.com/mickaelvieira/websocket/internal"
 )
 
 type Client interface {
@@ -33,7 +34,7 @@ func NewClientSocket(u string, opts ...OptionModifier) Client {
 	}
 
 	wc := &client{
-		id:             websocket.GenId(),
+		id:             internal.GenId(),
 		uri:            uri,
 		state:          disconnected,
 		states:         make(chan state),
