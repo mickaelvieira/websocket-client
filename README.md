@@ -1,18 +1,12 @@
 
 # WebSocket Client [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Go Reference](https://pkg.go.dev/badge/github.com/mickaelvieira/websocket.svg)](https://pkg.go.dev/github.com/mickaelvieira/websocket)
 
-A Go WebSocket library providing both client and server implementations as a thin layer around the [Gorilla websocket package](https://github.com/gorilla/websocket). Features automatic reconnection, state management, and ping/pong handling.
+A Go WebSocket library providing both client and server implementations as a thin and convenient wrapper around the [Gorilla websocket package](https://github.com/gorilla/websocket).
 
 ## Features
 
-- **Automatic Reconnection** - Client automatically reconnects on disconnection with configurable retry logic
-- **State Management** - Comprehensive state machine for connection lifecycle
-- **Ping/Pong Handling** - Built-in keep-alive mechanism
-- **Dual Implementations** - Both client and server socket implementations
-
-## State Machine
-
-This WebSocket client implements a comprehensive state machine that handles all connection lifecycle events:
+- **Client** - The client implementation can be used to connect a backend service to a WebSocket server. It will automatically reconnect ; it can send and receive text as well as binary messages over the WebSocket connection.
+- **Server** - The server implementation holds a connection with the WebSocket client. It can send and receive text and binary messages over the WebSocket connection.
 
 ## Installation
 
@@ -43,7 +37,7 @@ func main() {
     }))
 
     // Create client with custom configuration
-    c := client.NewClientSocket(
+    c := client.NewSocket(
         "wss://echo.websocket.org",
         client.WithLogger(logger),
         client.WithRetryInterval(2*time.Second),
@@ -121,7 +115,7 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
     }))
 
     // Create server socket
-    s := server.NewServerSocket(
+    s := server.NewSocket(
         conn,
         server.WithLogger(logger),
         server.WithPingInterval(30*time.Second),
@@ -175,7 +169,7 @@ import (
     gows "github.com/gorilla/websocket"
 )
 
-client := client.NewClientSocket("wss://api.example.com/ws",
+client := client.NewSocket("wss://api.example.com/ws",
     // Retry configuration
     client.WithRetryInterval(1*time.Second),      // Wait between retries (default: 5s)
     client.WithMaxRetryAttempts(5),               // Max reconnection attempts (default: 60)
@@ -209,7 +203,7 @@ import (
     "github.com/mickaelvieira/websocket/server"
 )
 
-server := server.NewServerSocket(conn,
+server := server.NewSocket(conn,
     // Ping configuration
     server.WithPingInterval(30*time.Second),      // Interval between pings (default: 54s)
 
