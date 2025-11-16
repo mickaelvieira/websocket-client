@@ -24,18 +24,18 @@ func TestNewServerSocket(t *testing.T) {
 			return
 		}
 
-		server := NewServerSocket(conn)
+		socket := NewSocket(conn)
 
-		if server == nil {
+		if socket == nil {
 			t.Fatal("Expected server to be created")
 		}
 
-		if server.Id() == "" {
+		if socket.Id() == "" {
 			t.Error("Expected server ID to be set")
 		}
 
 		defer func() {
-			if err := server.Close(); err != nil {
+			if err := socket.Close(); err != nil {
 				t.Logf("Error closing server: %v", err)
 			}
 		}()
@@ -64,7 +64,7 @@ func TestNewServerSocket(t *testing.T) {
 
 func TestServerReceiveTextMessage(t *testing.T) {
 	received := make(chan string, 1)
-	var serverSocket Server
+	var socket Socket
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -73,11 +73,11 @@ func TestServerReceiveTextMessage(t *testing.T) {
 			return
 		}
 
-		serverSocket = NewServerSocket(conn)
+		socket = NewSocket(conn)
 
 		// Read messages in goroutine
 		go func() {
-			for msg := range serverSocket.ReadTextMessages() {
+			for msg := range socket.ReadTextMessages() {
 				received <- msg
 			}
 		}()
@@ -116,8 +116,8 @@ func TestServerReceiveTextMessage(t *testing.T) {
 		t.Fatal("Timeout waiting for message")
 	}
 
-	if serverSocket != nil {
-		if err := serverSocket.Close(); err != nil {
+	if socket != nil {
+		if err := socket.Close(); err != nil {
 			t.Logf("Error closing server socket: %v", err)
 		}
 	}
@@ -125,7 +125,7 @@ func TestServerReceiveTextMessage(t *testing.T) {
 
 func TestServerReceiveBinaryMessage(t *testing.T) {
 	received := make(chan []byte, 1)
-	var serverSocket Server
+	var socket Socket
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -134,11 +134,11 @@ func TestServerReceiveBinaryMessage(t *testing.T) {
 			return
 		}
 
-		serverSocket = NewServerSocket(conn)
+		socket = NewSocket(conn)
 
 		// Read messages in goroutine
 		go func() {
-			for msg := range serverSocket.ReadBinaryMessages() {
+			for msg := range socket.ReadBinaryMessages() {
 				received <- msg
 			}
 		}()
@@ -182,15 +182,15 @@ func TestServerReceiveBinaryMessage(t *testing.T) {
 		t.Fatal("Timeout waiting for message")
 	}
 
-	if serverSocket != nil {
-		if err := serverSocket.Close(); err != nil {
+	if socket != nil {
+		if err := socket.Close(); err != nil {
 			t.Logf("Error closing server socket: %v", err)
 		}
 	}
 }
 
 func TestServerSendTextMessage(t *testing.T) {
-	var serverSocket Server
+	var socket Socket
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -199,12 +199,12 @@ func TestServerSendTextMessage(t *testing.T) {
 			return
 		}
 
-		serverSocket = NewServerSocket(conn)
+		socket = NewSocket(conn)
 
 		// Send a message after a small delay
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			serverSocket.SendTextMessage("Hello from server!")
+			socket.SendTextMessage("Hello from server!")
 		}()
 	})
 
@@ -243,15 +243,15 @@ func TestServerSendTextMessage(t *testing.T) {
 		t.Errorf("Expected message %q, got %q", expectedMessage, string(message))
 	}
 
-	if serverSocket != nil {
-		if err := serverSocket.Close(); err != nil {
+	if socket != nil {
+		if err := socket.Close(); err != nil {
 			t.Logf("Error closing server socket: %v", err)
 		}
 	}
 }
 
 func TestServerSendBinaryMessage(t *testing.T) {
-	var serverSocket Server
+	var socket Socket
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -260,12 +260,12 @@ func TestServerSendBinaryMessage(t *testing.T) {
 			return
 		}
 
-		serverSocket = NewServerSocket(conn)
+		socket = NewSocket(conn)
 
 		// Send a binary message after a small delay
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			serverSocket.SendBinaryMessage([]byte{0x05, 0x06, 0x07, 0x08})
+			socket.SendBinaryMessage([]byte{0x05, 0x06, 0x07, 0x08})
 		}()
 	})
 
@@ -309,8 +309,8 @@ func TestServerSendBinaryMessage(t *testing.T) {
 		}
 	}
 
-	if serverSocket != nil {
-		if err := serverSocket.Close(); err != nil {
+	if socket != nil {
+		if err := socket.Close(); err != nil {
 			t.Logf("Error closing server socket: %v", err)
 		}
 	}
@@ -318,7 +318,7 @@ func TestServerSendBinaryMessage(t *testing.T) {
 
 func TestServerPingPong(t *testing.T) {
 	pongReceived := make(chan string, 1)
-	var serverSocket Server
+	var socket Socket
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -327,7 +327,7 @@ func TestServerPingPong(t *testing.T) {
 			return
 		}
 
-		serverSocket = NewServerSocket(
+		socket = NewSocket(
 			conn,
 			WithPingInterval(1*time.Second),
 		)
@@ -378,15 +378,15 @@ func TestServerPingPong(t *testing.T) {
 		t.Fatal("Timeout waiting for ping")
 	}
 
-	if serverSocket != nil {
-		if err := serverSocket.Close(); err != nil {
+	if socket != nil {
+		if err := socket.Close(); err != nil {
 			t.Logf("Error closing server socket: %v", err)
 		}
 	}
 }
 
 func TestServerClose(t *testing.T) {
-	var serverSocket Server
+	var socket Socket
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -395,12 +395,12 @@ func TestServerClose(t *testing.T) {
 			return
 		}
 
-		serverSocket = NewServerSocket(conn)
+		socket = NewSocket(conn)
 
 		// Close after a delay
 		go func() {
 			time.Sleep(100 * time.Millisecond)
-			if err := serverSocket.Close(); err != nil {
+			if err := socket.Close(); err != nil {
 				t.Logf("Close error: %v", err)
 			}
 		}()
@@ -443,7 +443,7 @@ func TestServerClose(t *testing.T) {
 }
 
 func TestServerWaitChannel(t *testing.T) {
-	var serverSocket Server
+	var socket Socket
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -452,7 +452,7 @@ func TestServerWaitChannel(t *testing.T) {
 			return
 		}
 
-		serverSocket = NewServerSocket(conn)
+		socket = NewSocket(conn)
 	})
 
 	testServer := httptest.NewServer(handler)
@@ -476,9 +476,9 @@ func TestServerWaitChannel(t *testing.T) {
 	}
 
 	// Wait for server to detect close
-	if serverSocket != nil {
+	if socket != nil {
 		select {
-		case <-serverSocket.Wait():
+		case <-socket.Wait():
 			t.Log("Server detected close via Wait channel")
 		case <-time.After(5 * time.Second):
 			t.Fatal("Timeout waiting for close notification")

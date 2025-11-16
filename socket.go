@@ -8,13 +8,6 @@ var (
 	ErrNotConnected = errors.New("websocket client not connected")
 )
 
-// OutboundMessage represents a message
-// to be sent over the websocket connection
-type OutboundMessage struct {
-	DataType int
-	Data     []byte
-}
-
 type Socket interface {
 	// Unique identifier of the websocket peer
 	Id() string

@@ -10,19 +10,21 @@ import (
 	"github.com/mickaelvieira/websocket/internal"
 )
 
-type Server interface {
+// Socket represents a websocket server peer,
+// it can be used to send/receive messages.
+type Socket interface {
 	websocket.Socket
 
 	// Channel to receive close notifications
 	Wait() <-chan struct{}
 }
 
-func NewServerSocket(conn *gows.Conn, opts ...OptionModifier) Server {
+func NewSocket(conn *gows.Conn, opts ...OptionModifier) Socket {
 	wc := &server{
 		id:             internal.GenId(),
 		conn:           conn,
 		wait:           make(chan struct{}),
-		outbound:       make(chan websocket.OutboundMessage),
+		outbound:       make(chan internal.OutboundMessage),
 		textMessages:   make(chan string),
 		binaryMessages: make(chan []byte),
 		options:        &defaultOptions,
@@ -62,7 +64,7 @@ type server struct {
 	wait chan struct{}
 
 	// outgoing messages to the peer
-	outbound chan websocket.OutboundMessage
+	outbound chan internal.OutboundMessage
 
 	// incoming messages from the peer
 	binaryMessages chan []byte
@@ -88,7 +90,7 @@ func (s *server) ReadBinaryMessages() <-chan []byte {
 
 // SendBinaryMessage sends a binary message to the websocket server
 func (s *server) SendBinaryMessage(d []byte) {
-	s.outbound <- websocket.OutboundMessage{
+	s.outbound <- internal.OutboundMessage{
 		Data:     d,
 		DataType: gows.BinaryMessage,
 	}
@@ -101,7 +103,7 @@ func (s *server) ReadTextMessages() <-chan string {
 
 // SendTextMessage sends a text message to the websocket server
 func (s *server) SendTextMessage(d string) {
-	s.outbound <- websocket.OutboundMessage{
+	s.outbound <- internal.OutboundMessage{
 		Data:     []byte(d),
 		DataType: gows.TextMessage,
 	}

@@ -56,17 +56,17 @@ func TestNewClientSocket(t *testing.T) {
 	server, wsURL := setupEchoServer(t)
 	defer server.Close()
 
-	client := NewClientSocket(wsURL)
-	if client == nil {
+	socket := NewSocket(wsURL)
+	if socket == nil {
 		t.Fatal("Expected client to be created")
 	}
 	defer func() {
-		if err := client.Close(); err != nil {
+		if err := socket.Close(); err != nil {
 			t.Logf("Error closing client: %v", err)
 		}
 	}()
 
-	if client.Id() == "" {
+	if socket.Id() == "" {
 		t.Error("Expected client ID to be set")
 	}
 }
@@ -75,9 +75,9 @@ func TestClientConnection(t *testing.T) {
 	server, wsURL := setupEchoServer(t)
 	defer server.Close()
 
-	client := NewClientSocket(wsURL)
+	socket := NewSocket(wsURL)
 	defer func() {
-		if err := client.Close(); err != nil {
+		if err := socket.Close(); err != nil {
 			t.Logf("Error closing client: %v", err)
 		}
 	}()
@@ -88,7 +88,7 @@ func TestClientConnection(t *testing.T) {
 
 	for !connected {
 		select {
-		case status := <-client.Statuses():
+		case status := <-socket.Statuses():
 			if status.IsConnected() {
 				connected = true
 			}
@@ -97,7 +97,7 @@ func TestClientConnection(t *testing.T) {
 		}
 	}
 
-	if !client.IsConnected() {
+	if !socket.IsConnected() {
 		t.Error("Expected client to be connected")
 	}
 }
@@ -106,24 +106,24 @@ func TestClientSendTextMessage(t *testing.T) {
 	server, wsURL := setupEchoServer(t)
 	defer server.Close()
 
-	client := NewClientSocket(wsURL)
+	socket := NewSocket(wsURL)
 	defer func() {
-		if err := client.Close(); err != nil {
+		if err := socket.Close(); err != nil {
 			t.Logf("Error closing client: %v", err)
 		}
 	}()
 
 	// Wait for connection
-	waitForConnection(t, client)
+	waitForConnection(t, socket)
 
 	testMessage := "Hello, WebSocket!"
 
 	// Send message
-	client.SendTextMessage(testMessage)
+	socket.SendTextMessage(testMessage)
 
 	// Read echoed message
 	select {
-	case msg := <-client.ReadTextMessages():
+	case msg := <-socket.ReadTextMessages():
 		if msg != testMessage {
 			t.Errorf("Expected message %q, got %q", testMessage, msg)
 		}
@@ -136,24 +136,24 @@ func TestClientSendBinaryMessage(t *testing.T) {
 	server, wsURL := setupEchoServer(t)
 	defer server.Close()
 
-	client := NewClientSocket(wsURL)
+	socket := NewSocket(wsURL)
 	defer func() {
-		if err := client.Close(); err != nil {
+		if err := socket.Close(); err != nil {
 			t.Logf("Error closing client: %v", err)
 		}
 	}()
 
 	// Wait for connection
-	waitForConnection(t, client)
+	waitForConnection(t, socket)
 
 	testData := []byte{0x01, 0x02, 0x03, 0x04}
 
 	// Send binary message
-	client.SendBinaryMessage(testData)
+	socket.SendBinaryMessage(testData)
 
 	// Read echoed message
 	select {
-	case data := <-client.ReadBinaryMessages():
+	case data := <-socket.ReadBinaryMessages():
 		if len(data) != len(testData) {
 			t.Errorf("Expected data length %d, got %d", len(testData), len(data))
 		}
@@ -171,13 +171,13 @@ func TestClientGracefulClose(t *testing.T) {
 	server, wsURL := setupEchoServer(t)
 	defer server.Close()
 
-	client := NewClientSocket(wsURL)
+	socket := NewSocket(wsURL)
 
 	// Wait for connection
-	waitForConnection(t, client)
+	waitForConnection(t, socket)
 
 	// Close gracefully
-	if err := client.Close(); err != nil {
+	if err := socket.Close(); err != nil {
 		t.Errorf("Expected no error on close, got %v", err)
 	}
 
@@ -187,7 +187,7 @@ func TestClientGracefulClose(t *testing.T) {
 
 	for !disconnected {
 		select {
-		case status, ok := <-client.Statuses():
+		case status, ok := <-socket.Statuses():
 			if !ok {
 				// Channel closed
 				disconnected = true
@@ -201,7 +201,7 @@ func TestClientGracefulClose(t *testing.T) {
 }
 
 // Helper function to wait for client connection
-func waitForConnection(t *testing.T, client Client) {
+func waitForConnection(t *testing.T, client Socket) {
 	timeout := time.After(5 * time.Second)
 	for {
 		select {

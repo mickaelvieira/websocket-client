@@ -13,7 +13,9 @@ import (
 	"github.com/mickaelvieira/websocket/internal"
 )
 
-type Client interface {
+// Socket represents a websocket client, it can be used to connect
+// to a websocket server and send/receive messages.
+type Socket interface {
 	websocket.Socket
 
 	// Channel to receive status updates
@@ -23,10 +25,10 @@ type Client interface {
 	IsConnected() bool
 }
 
-// NewClientSocket provides a new websocket client that will connect to the server
+// NewSocket provides a new websocket client that will connect to the server
 // at the given URI. It will panic if the URI is invalid.
 // The client will automatically attempt to reconnect on disconnections.
-func NewClientSocket(u string, opts ...OptionModifier) Client {
+func NewSocket(u string, opts ...OptionModifier) Socket {
 	uri, err := url.ParseRequestURI(u)
 	if err != nil {
 		log.Fatalf("invalid server URI %s", err)
@@ -39,7 +41,7 @@ func NewClientSocket(u string, opts ...OptionModifier) Client {
 		state:          disconnected,
 		states:         make(chan state),
 		statuses:       make(chan Status),
-		outbound:       make(chan websocket.OutboundMessage),
+		outbound:       make(chan internal.OutboundMessage),
 		textMessages:   make(chan string),
 		binaryMessages: make(chan []byte),
 		closeAck:       make(chan bool, 1),
@@ -99,7 +101,7 @@ type client struct {
 	statuses chan Status
 
 	// outgoing messages to the peer
-	outbound chan websocket.OutboundMessage
+	outbound chan internal.OutboundMessage
 
 	// incoming binary messages from the peer
 	binaryMessages chan []byte
@@ -395,7 +397,7 @@ func (c *client) ReadTextMessages() <-chan string {
 
 // SendTextMessage sends a text message to the websocket server
 func (s *client) SendTextMessage(d string) {
-	s.outbound <- websocket.OutboundMessage{
+	s.outbound <- internal.OutboundMessage{
 		Data:     []byte(d),
 		DataType: gows.TextMessage,
 	}
@@ -408,7 +410,7 @@ func (c *client) ReadBinaryMessages() <-chan []byte {
 
 // SendBinaryMessage sends a binary message to the websocket server
 func (s *client) SendBinaryMessage(d []byte) {
-	s.outbound <- websocket.OutboundMessage{
+	s.outbound <- internal.OutboundMessage{
 		Data:     d,
 		DataType: gows.BinaryMessage,
 	}
