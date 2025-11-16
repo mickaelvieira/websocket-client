@@ -39,16 +39,14 @@ func WithHeaders(h http.Header) OptionModifier {
 	}
 }
 
-// WithLogger allows passing a custom logger for the websocket client
-// @see https://pkg.go.dev/log/slog
+// WithLogger allows passing a custom [slog.Logger] for the websocket client
 func WithLogger(l *slog.Logger) OptionModifier {
 	return func(o *options) {
 		o.logger = l
 	}
 }
 
-// WithDialerModifier allows customizing the underlying websocket dialer before connecting
-// @see https://github.com/gorilla/websocket/blob/main/client.go#L53
+// WithDialerModifier allows customizing the underlying websocket [websocket.Dialer] before connecting
 func WithDialerModifier(m DialerModifier) OptionModifier {
 	return func(o *options) {
 		o.dialerModifier = m
