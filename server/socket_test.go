@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	gows "github.com/gorilla/websocket"
+	"github.com/gorilla/websocket"
 )
 
-var upgrader = gows.Upgrader{
+var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
@@ -47,7 +47,7 @@ func TestNewServerSocket(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
 
 	// Create a client connection to trigger the handler
-	dialer := gows.DefaultDialer
+	dialer := websocket.DefaultDialer
 	conn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
@@ -89,7 +89,7 @@ func TestServerReceiveTextMessage(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
 
 	// Create a client connection
-	dialer := gows.DefaultDialer
+	dialer := websocket.DefaultDialer
 	clientConn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
@@ -102,7 +102,7 @@ func TestServerReceiveTextMessage(t *testing.T) {
 
 	// Send a text message from client
 	testMessage := "Hello from client!"
-	if err := clientConn.WriteMessage(gows.TextMessage, []byte(testMessage)); err != nil {
+	if err := clientConn.WriteMessage(websocket.TextMessage, []byte(testMessage)); err != nil {
 		t.Fatalf("Failed to send message: %v", err)
 	}
 
@@ -150,7 +150,7 @@ func TestServerReceiveBinaryMessage(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
 
 	// Create a client connection
-	dialer := gows.DefaultDialer
+	dialer := websocket.DefaultDialer
 	clientConn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
@@ -163,7 +163,7 @@ func TestServerReceiveBinaryMessage(t *testing.T) {
 
 	// Send a binary message from client
 	testData := []byte{0x01, 0x02, 0x03, 0x04}
-	if err := clientConn.WriteMessage(gows.BinaryMessage, testData); err != nil {
+	if err := clientConn.WriteMessage(websocket.BinaryMessage, testData); err != nil {
 		t.Fatalf("Failed to send message: %v", err)
 	}
 
@@ -214,7 +214,7 @@ func TestServerSendTextMessage(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
 
 	// Create a client connection
-	dialer := gows.DefaultDialer
+	dialer := websocket.DefaultDialer
 	clientConn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
@@ -234,7 +234,7 @@ func TestServerSendTextMessage(t *testing.T) {
 		t.Fatalf("Failed to read message: %v", err)
 	}
 
-	if messageType != gows.TextMessage {
+	if messageType != websocket.TextMessage {
 		t.Errorf("Expected text message type, got %d", messageType)
 	}
 
@@ -275,7 +275,7 @@ func TestServerSendBinaryMessage(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
 
 	// Create a client connection
-	dialer := gows.DefaultDialer
+	dialer := websocket.DefaultDialer
 	clientConn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
@@ -295,7 +295,7 @@ func TestServerSendBinaryMessage(t *testing.T) {
 		t.Fatalf("Failed to read message: %v", err)
 	}
 
-	if messageType != gows.BinaryMessage {
+	if messageType != websocket.BinaryMessage {
 		t.Errorf("Expected binary message type, got %d", messageType)
 	}
 
@@ -339,7 +339,7 @@ func TestServerPingPong(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
 
 	// Create a client connection with pong handler
-	dialer := gows.DefaultDialer
+	dialer := websocket.DefaultDialer
 	client, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
@@ -355,7 +355,7 @@ func TestServerPingPong(t *testing.T) {
 		t.Logf("Client received ping with data: %s", appData)
 		pongReceived <- appData
 		// Send pong back
-		if err := client.WriteControl(gows.PongMessage, []byte(appData), time.Now().Add(time.Second)); err != nil {
+		if err := client.WriteControl(websocket.PongMessage, []byte(appData), time.Now().Add(time.Second)); err != nil {
 			t.Logf("Failed to send pong: %v", err)
 		}
 		return nil
@@ -412,7 +412,7 @@ func TestServerClose(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
 
 	// Create a client connection
-	dialer := gows.DefaultDialer
+	dialer := websocket.DefaultDialer
 	clientConn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)
@@ -435,7 +435,7 @@ func TestServerClose(t *testing.T) {
 	}
 
 	// Verify it's a close error
-	if !gows.IsCloseError(err, gows.CloseNormalClosure) && !gows.IsUnexpectedCloseError(err, gows.CloseNormalClosure) {
+	if !websocket.IsCloseError(err, websocket.CloseNormalClosure) && !websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure) {
 		t.Logf("Expected close error, got: %v", err)
 	} else {
 		t.Log("Server closed successfully")
@@ -461,7 +461,7 @@ func TestServerWaitChannel(t *testing.T) {
 	wsURL := "ws" + strings.TrimPrefix(testServer.URL, "http")
 
 	// Create a client connection
-	dialer := gows.DefaultDialer
+	dialer := websocket.DefaultDialer
 	clientConn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to dial: %v", err)

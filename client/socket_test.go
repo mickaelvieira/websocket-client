@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	gows "github.com/gorilla/websocket"
+	"github.com/gorilla/websocket"
 )
 
-var upgrader = gows.Upgrader{
+var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
@@ -33,7 +33,7 @@ func setupEchoServer(t *testing.T) (*httptest.Server, string) {
 		for {
 			messageType, message, err := conn.ReadMessage()
 			if err != nil {
-				if gows.IsUnexpectedCloseError(err, gows.CloseNormalClosure, gows.CloseGoingAway) {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
 					t.Logf("Unexpected close error: %v", err)
 				}
 				break

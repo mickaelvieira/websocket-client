@@ -1,6 +1,7 @@
 package client
 
-// outside world statuses
+// Status represents the current connection status of the websocket client
+// it can be either Connected or Disconnected.
 type Status uint64
 
 const (

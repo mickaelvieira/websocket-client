@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	gows "github.com/gorilla/websocket"
+	"github.com/gorilla/websocket"
 )
 
-type DialerModifier func(*gows.Dialer)
+type DialerModifier func(*websocket.Dialer)
 type OptionModifier func(*options)
 
 // WithRetryInterval sets the interval between reconnection attempts
