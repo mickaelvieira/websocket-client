@@ -1,7 +1,7 @@
+// Package client implements a websocket client that can connect to a websocket server,
 package client
 
 import (
-	"log"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -25,16 +25,15 @@ type Socket interface {
 	IsConnected() bool
 }
 
+const (
+	initialRetryAttemptsValue = 0
+	defaultHandshakeTimeout   = 45 * time.Second
+)
+
 // NewSocket provides a new websocket client that will connect to the server
 // at the given URI. It will panic if the URI is invalid.
 // The client will automatically attempt to reconnect on disconnections.
-func NewSocket(u string, opts ...OptionModifier) Socket {
-	uri, err := url.ParseRequestURI(u)
-	if err != nil {
-		log.Fatalf("invalid server URI %s", err)
-		return nil
-	}
-
+func NewSocket(uri *url.URL, opts ...OptionModifier) Socket {
 	wc := &client{
 		id:             internal.GenId(),
 		uri:            uri,
@@ -44,12 +43,12 @@ func NewSocket(u string, opts ...OptionModifier) Socket {
 		outbound:       make(chan internal.OutboundMessage),
 		textMessages:   make(chan string),
 		binaryMessages: make(chan []byte),
-		closeAck:       make(chan bool, 1),
-		retryAttempts:  0,
+		closeAck:       make(chan bool, 1), // nolint:revive // buffered to avoid blocking
+		retryAttempts:  initialRetryAttemptsValue,
 		options:        &defaultOptions,
 		dialer: &gows.Dialer{
 			Proxy:            http.ProxyFromEnvironment,
-			HandshakeTimeout: 45 * time.Second,
+			HandshakeTimeout: defaultHandshakeTimeout,
 		},
 	}
 
@@ -71,7 +70,7 @@ func NewSocket(u string, opts ...OptionModifier) Socket {
 	go func() {
 		// Send initial disconnected status
 		time.Sleep(10 * time.Millisecond) // Small delay to ensure handler is ready
-		// wc.statuses <- StatusDisconnected
+
 		wc.states <- connecting
 	}()
 
@@ -126,7 +125,6 @@ type client struct {
 }
 
 func (c *client) handle() {
-
 	for s := range c.states {
 		c.lock.Lock()
 		p := c.state
@@ -140,12 +138,13 @@ func (c *client) handle() {
 		switch s {
 		case connecting:
 			c.logger.Debug("attempting to connect", "uri", c.uri.String())
+
 			go c.connect()
 
 		case connected:
 			c.logger.Debug("connection established")
 
-			c.retryAttempts = 0 // Reset retry attempts on successful connection
+			c.retryAttempts = initialRetryAttemptsValue
 			c.statuses <- statusConnected
 
 			go c.read()  // read incoming messages
@@ -153,23 +152,25 @@ func (c *client) handle() {
 
 		case reconnecting:
 			c.retryAttempts++
-			c.logger.Info("attempting to reconnect", "attempt", c.retryAttempts, "max", c.options.maxRetryAttempts)
+			c.logger.Info("attempting to reconnect",
+				"attempt", c.retryAttempts,
+				"max", c.options.maxRetryAttempts,
+			)
 
 			if c.retryAttempts >= c.options.maxRetryAttempts {
 				c.logger.Info("max retry attempts reached, giving up")
 
-				c.retryAttempts = 0
+				c.retryAttempts = initialRetryAttemptsValue
 				c.statuses <- statusDisconnected
 
 				return // Exit the loop for final disconnection
-			} else {
-				// Schedule next connection attempt without blocking the state machine
-				go func() {
-					time.Sleep(c.options.retryInterval)
-					c.states <- connecting
-				}()
 			}
+			// Schedule next connection attempt without blocking the state machine
+			go func() {
+				time.Sleep(c.options.retryInterval)
 
+				c.states <- connecting
+			}()
 		case closing:
 			c.logger.Debug("closing connection")
 
@@ -180,9 +181,12 @@ func (c *client) handle() {
 			c.logger.Debug("disconnected")
 
 			c.statuses <- statusDisconnected
-			c.retryAttempts = 0
+
+			c.retryAttempts = initialRetryAttemptsValue
 
 			return // Exit the loop for final disconnection
+		default:
+			c.logger.Warn("unknown state encountered", "state", s.String())
 		}
 	}
 }
@@ -193,12 +197,17 @@ func (c *client) connect() {
 
 	conn, _, err := c.dialer.Dial(c.uri.String(), c.options.headers)
 	if err != nil {
-		c.logger.Error("connection failure", "uri", c.uri.String(), "error", err, "attempt", c.retryAttempts+1)
+		c.logger.Error("connection failure",
+			"uri", c.uri.String(),
+			"error", err,
+			"attempt", c.retryAttempts+1,
+		)
 
 		c.conn = nil
 
 		// Connection refused/timeout -> go to reconnecting state
 		c.states <- reconnecting
+
 		return
 	}
 
@@ -226,10 +235,14 @@ func (c *client) connect() {
 
 	conn.SetPongHandler(func(appData string) error {
 		if appData != c.id {
-			if err := c.closeWithCode(gows.CloseInvalidFramePayloadData, "invalid pong payload"); err != nil {
+			if err := c.closeWithCode(
+				gows.CloseInvalidFramePayloadData,
+				"invalid pong payload",
+			); err != nil {
 				c.logger.Error("failed to close connection on invalid pong", "error", err)
 			}
 		}
+
 		return nil
 	})
 
@@ -296,8 +309,9 @@ func (c *client) cleanup() {
 	// close connection if it exists
 	if c.conn != nil {
 		if err := c.conn.Close(); err != nil {
-			c.logger.Error("error closing connection during cleanup", "error", err)
+			c.logger.Error("error closing connection during cleanup", "error", err) //nolint:revive // no need to create a constant for the error string
 		}
+
 		c.conn = nil
 	}
 
@@ -331,12 +345,15 @@ func (c *client) read() {
 			c.textMessages <- string(m)
 		case gows.BinaryMessage:
 			c.binaryMessages <- m
+		default:
+			c.logger.Warn("unsupported message type", "type", t)
 		}
 	}
 }
 
 func (c *client) write() {
 	ticker := time.NewTicker(c.options.pingInterval)
+
 	defer func() {
 		ticker.Stop()
 	}()
@@ -344,7 +361,6 @@ func (c *client) write() {
 	for {
 		select {
 		case m, ok := <-c.outbound:
-
 			if !ok {
 				// just exist the write loop
 				// when outbound channel is closed
@@ -354,6 +370,7 @@ func (c *client) write() {
 			if err := c.conn.SetWriteDeadline(time.Now().Add(c.options.writeWait)); err != nil {
 				c.logger.Error("deadline error", "error", err)
 			}
+
 			if err := c.conn.WriteMessage(m.DataType, m.Data); err != nil {
 				c.logger.Error("write error", "error", err)
 				return
@@ -396,8 +413,8 @@ func (c *client) ReadTextMessages() <-chan string {
 }
 
 // SendTextMessage sends a text message to the websocket server
-func (s *client) SendTextMessage(d string) {
-	s.outbound <- internal.OutboundMessage{
+func (c *client) SendTextMessage(d string) {
+	c.outbound <- internal.OutboundMessage{
 		Data:     []byte(d),
 		DataType: gows.TextMessage,
 	}
@@ -409,8 +426,8 @@ func (c *client) ReadBinaryMessages() <-chan []byte {
 }
 
 // SendBinaryMessage sends a binary message to the websocket server
-func (s *client) SendBinaryMessage(d []byte) {
-	s.outbound <- internal.OutboundMessage{
+func (c *client) SendBinaryMessage(d []byte) {
+	c.outbound <- internal.OutboundMessage{
 		Data:     d,
 		DataType: gows.BinaryMessage,
 	}

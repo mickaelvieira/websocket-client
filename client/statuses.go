@@ -9,10 +9,12 @@ const (
 	statusConnected
 )
 
+// IsConnected returns true if the status is Connected
 func (s Status) IsConnected() bool {
 	return s == statusConnected
 }
 
+// IsDisconnected returns true if the status is Disconnected
 func (s Status) IsDisconnected() bool {
 	return s == statusDisconnected
 }

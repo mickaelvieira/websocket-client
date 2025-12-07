@@ -1,3 +1,4 @@
+// Package server implements a websocket server peer that can be used to send/receive messages.
 package server
 
 import (
@@ -19,6 +20,7 @@ type Socket interface {
 	Wait() <-chan struct{}
 }
 
+// NewSocket creates a new websocket server peer
 func NewSocket(conn *gows.Conn, opts ...OptionModifier) Socket {
 	wc := &server{
 		id:             internal.GenId(),
@@ -115,13 +117,16 @@ func (s *server) read() {
 	}()
 
 	s.conn.SetReadLimit(s.options.readLimit)
+
 	if err := s.conn.SetReadDeadline(time.Now().Add(s.options.pongWait)); err != nil {
 		s.logger.Error("deadline error", "error", err)
 	}
+
 	s.conn.SetPongHandler(func(string) error {
 		if err := s.conn.SetReadDeadline(time.Now().Add(s.options.pongWait)); err != nil {
 			s.logger.Error("deadline error", "error", err)
 		}
+
 		return nil
 	})
 
@@ -133,6 +138,7 @@ func (s *server) read() {
 			if gows.IsUnexpectedCloseError(err, gows.CloseNormalClosure, gows.CloseGoingAway) {
 				s.logger.Error("read error", "error", err)
 			}
+
 			break
 		}
 
@@ -142,41 +148,44 @@ func (s *server) read() {
 			s.textMessages <- string(d)
 		case gows.BinaryMessage:
 			s.binaryMessages <- d
+		default:
+			s.logger.Warn("unsupported message type", "type", t)
 		}
 	}
 }
 
-func (c *server) write() {
-	ticker := time.NewTicker(c.options.pingInterval)
+func (s *server) write() {
+	ticker := time.NewTicker(s.options.pingInterval)
+
 	defer func() {
 		ticker.Stop()
 	}()
 
 	for {
 		select {
-		case m, ok := <-c.outbound:
-
+		case m, ok := <-s.outbound:
 			if !ok {
 				// just exist the write loop
 				// when outbound channel is closed
 				return
 			}
 
-			if err := c.conn.SetWriteDeadline(time.Now().Add(c.options.writeWait)); err != nil {
-				c.logger.Error("deadline error", "error", err)
+			if err := s.conn.SetWriteDeadline(time.Now().Add(s.options.writeWait)); err != nil {
+				s.logger.Error("deadline error", "error", err) //nolint:revive // no need to create a constant for the error string
 			}
-			if err := c.conn.WriteMessage(m.DataType, m.Data); err != nil {
-				c.logger.Error("write error", "error", err)
+
+			if err := s.conn.WriteMessage(m.DataType, m.Data); err != nil {
+				s.logger.Error("write error", "error", err)
 				return
 			}
 		case <-ticker.C:
-			d := []byte(c.id)
-			t := time.Now().Add(c.options.writeWait)
+			d := []byte(s.id)
+			t := time.Now().Add(s.options.writeWait)
 
-			c.logger.Debug("pinging client", "data", d, "internal", c.options.pingInterval)
+			s.logger.Debug("pinging client", "data", d, "internal", s.options.pingInterval)
 
-			if err := c.conn.WriteControl(gows.PingMessage, d, t); err != nil {
-				c.logger.Error("ping error", "error", err)
+			if err := s.conn.WriteControl(gows.PingMessage, d, t); err != nil {
+				s.logger.Error("ping error", "error", err)
 				return
 			}
 		}
@@ -195,6 +204,7 @@ func (s *server) cleanup() {
 		if err := s.conn.Close(); err != nil {
 			s.logger.Error("closing error during cleanup", "error", err)
 		}
+
 		s.conn = nil
 	}
 

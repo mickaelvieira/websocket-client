@@ -1,13 +1,9 @@
+// Package websocket provides two implementations of websocket connections.
+// The client is able to connect to a websocket server and maintains the connection.
+// The server represents a connected websocket client to the server.
 package websocket
 
-// https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers#pings_and_pongs_the_heartbeat_of_websockets
-
-import "errors"
-
-var (
-	ErrNotConnected = errors.New("websocket client not connected")
-)
-
+// Socket is an interface representing a websocket peer connection.
 type Socket interface {
 	// Unique identifier of the websocket peer
 	Id() string

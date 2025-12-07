@@ -8,7 +8,10 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// DialerModifier defines a function type to modify the websocket Dialer
 type DialerModifier func(*websocket.Dialer)
+
+// OptionModifier defines a function type to modify client options
 type OptionModifier func(*options)
 
 // WithRetryInterval sets the interval between reconnection attempts
@@ -46,7 +49,8 @@ func WithLogger(l *slog.Logger) OptionModifier {
 	}
 }
 
-// WithDialerModifier allows customizing the underlying websocket [websocket.Dialer] before connecting
+// WithDialerModifier allows customizing
+// the underlying [github.com/gorilla/websocket.Dialer] before connecting
 func WithDialerModifier(m DialerModifier) OptionModifier {
 	return func(o *options) {
 		o.dialerModifier = m

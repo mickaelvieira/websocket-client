@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// OptionModifier defines a function type to modify server options
 type OptionModifier func(*options)
 
 // WithRetryInterval sets the interval between reconnection attempts
@@ -36,6 +37,7 @@ func WithLogger(l *slog.Logger) OptionModifier {
 	}
 }
 
+// WithOnCloseCallback sets a callback function to be called when the socket is closed
 func WithOnCloseCallback(cb func()) OptionModifier {
 	return func(o *options) {
 		o.onClose = cb
