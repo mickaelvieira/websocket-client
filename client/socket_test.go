@@ -3,6 +3,7 @@ package client
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -17,7 +18,7 @@ var upgrader = websocket.Upgrader{
 }
 
 // setupEchoServer creates a test WebSocket server that echoes messages back
-func setupEchoServer(t *testing.T) (*httptest.Server, string) {
+func setupEchoServer(t *testing.T) (*httptest.Server, *url.URL) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -49,7 +50,12 @@ func setupEchoServer(t *testing.T) (*httptest.Server, string) {
 
 	server := httptest.NewServer(handler)
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
-	return server, wsURL
+	parsedURL, err := url.Parse(wsURL)
+	if err != nil {
+		t.Fatalf("Failed to parse WebSocket URL: %v", err)
+	}
+
+	return server, parsedURL
 }
 
 func TestNewClientSocket(t *testing.T) {
